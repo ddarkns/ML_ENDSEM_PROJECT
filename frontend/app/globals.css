@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #000000;
+  --color-foreground: #ffffff;
+  --color-primary: #e50914; /* Netflix Red */
+}
+
+body {
+  background-color: black;
+  color: white;
+  font-family: sans-serif;
+}
