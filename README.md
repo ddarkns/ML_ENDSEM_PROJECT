@@ -13,5 +13,6 @@ uv run main.py
 #### for frontend
 ```bash
 cd frontend
-npm install
-npm run dev```
+npm run dev
+```
+
