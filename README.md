@@ -4,7 +4,12 @@ This project is a movie recommendation system. It uses a **FastAPI** backend wit
 
 ##Getting Started
 
-Follow these simple steps to run the application locally.
+Follow these simple steps to run the website.
+
+#### to install dependencies
+```bash
+uv sync
+```
 
 #### for backend
 ```bash
