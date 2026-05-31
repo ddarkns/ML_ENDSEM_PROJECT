@@ -62,6 +62,8 @@ class WatchHistory(BaseModel):
 class DescriptionPayload(BaseModel):
     description: str
 
+# --- HELPER LOGIC ---
+
 def format_movie_data(title: str, cluster_id: int = -1, score: float = 0.0):
     """Merges Chroma results with full Excel metadata."""
     row = df[df['Title_Str'] == title]
@@ -84,13 +86,58 @@ def format_movie_data(title: str, cluster_id: int = -1, score: float = 0.0):
 
 @app.get("/movies")
 def list_movies(limit: int = 40):
-    """Initial load for the UI grid.""" 
+    """Initial load for the UI grid."""
+    return df.head(limit).to_dict(orient="records")
+
+@app.get("/search")
+async def dynamic_search(query: str = Query(..., min_length=1)):
+    """
+    Scans all 9,000+ movies for a partial match.
+    This will find 'Home Bound' even if you just type 'Home'.
+    """
+    if not query:
+        return []
+    
+    # Partial string match across the whole dataset
+    mask = df['Title_Str'].str.contains(query, case=False, na=False)
+    results = df[mask].head(10)
+    return results.to_dict(orient="records")
+
+@app.post("/recommend")
+def recommend(payload: WatchHistory):
+    """
+    AI Recommendation using Hybrid K-Means + ChromaDB.
+    Accepts POST with movie_titles list.
+    """
+    if not payload.movie_titles:
+        return []
+
+    all_recs = []
+    
+    for title in payload.movie_titles:
+        # Find the specific movie info
+        row = df[df['Title_Str'] == title]
+        if row.empty:
+            continue
+            
+        target_overview = str(row.iloc[0]['Overview'])
+        
+        # 1. AI Logic: Predict Cluster
+        query_emb = hf_embeddings.embed_query(target_overview)
+        query_vec = np.array([query_emb], dtype=kmeans_final.cluster_centers_.dtype)
+        cluster_id = int(kmeans_final.predict(query_vec)[0])
+
+        # 2. AI Logic: Vector Search in predicted cluster
+        results = vectorstore.similarity_search_with_score(
+            query=target_overview,
+            k=8, # Get 8 to filter out the seed movie
             filter={"cluster": cluster_id}
         )
 
         for doc, dist_score in results:
             t = doc.metadata.get('title')
-            if t == title: continue # Skip the clicked movie
+            if t == title: 
+                continue # Skip the clicked movie
             
             # Distance to Similarity conversion
             sim_val = max(0, 1 - (dist_score / 2)) 
@@ -116,7 +163,7 @@ def recommend_by_description(payload: DescriptionPayload):
         # Directly run similarity search over the entire collection using the vector store
         results = vectorstore.similarity_search_with_score(
             query=payload.description,
-            k=10
+            k=5 # Changed to 5 so it returns the exact limit expected by the UI
         )
         
         description_recs = []
